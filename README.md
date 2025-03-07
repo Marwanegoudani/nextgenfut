@@ -1,24 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NextGenFut
+
+NextGenFut is a modern, professional, and user-friendly web application designed for football enthusiasts, especially juniors. The platform enables players to organize matches, rate performances, and helps scouts discover new talents.
+
+## Key Features
+
+1. **User Profiles** – Players, teams, and scouts can create and manage profiles.
+2. **Match Organization** – Users can create, join, and manage football matches.
+3. **Player Rating System** – After each game, players can rate each other's performances.
+4. **Talent Discovery & Scouting** – Scouts can search, filter, and track players based on performance data.
+
+## Tech Stack
+
+- **Frontend**: Next.js, React, Tailwind CSS, Shadcn UI
+- **Backend**: Next.js API Routes
+- **Database**: MongoDB with Mongoose
+- **Authentication**: NextAuth.js
+- **Form Handling**: React Hook Form with Zod validation
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Node.js (v18 or later)
+- npm or yarn
+- MongoDB (local or Atlas)
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/nextgenfut.git
+   cd nextgenfut
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
+
+3. Create a `.env.local` file in the root directory with the following variables:
+   ```
+   MONGODB_URI=your_mongodb_connection_string
+   NEXTAUTH_SECRET=your_nextauth_secret
+   NEXTAUTH_URL=http://localhost:3000
+   ```
+
+4. Run the development server:
+   ```bash
+   npm run dev
+   # or
+   yarn dev
+   ```
+
+5. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
+
+## Project Structure
+
+```
+nextgenfut/
+├── public/            # Static assets
+├── src/
+│   ├── app/           # Next.js App Router pages
+│   ├── components/    # React components
+│   ├── lib/           # Utility functions and configurations
+│   └── models/        # MongoDB models
+├── .env.local         # Environment variables (create this file)
+└── ...
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## License
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Learn More
 
