@@ -28,14 +28,14 @@ export default function RootLayout({
           <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
             <div className="container mx-auto px-4 py-3 flex justify-between items-center">
               <Logo size="medium" />
-              <nav className="hidden md:flex space-x-6">
+              <nav className="hidden md:flex items-center space-x-6">
                 <Link href="/" className="text-gray-600 hover:text-green-600 transition-colors">Home</Link>
                 <Link href="/matches" className="text-gray-600 hover:text-green-600 transition-colors">Matches</Link>
                 <Link href="/scouts" className="text-gray-600 hover:text-green-600 transition-colors">Scouts</Link>
                 <Link href="/auth/login" className="text-gray-600 hover:text-green-600 transition-colors">Sign In</Link>
                 <Link 
                   href="/auth/register" 
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md transition-colors"
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-md transition-colors"
                 >
                   Sign Up
                 </Link>
