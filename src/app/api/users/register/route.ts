@@ -1,102 +1,94 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
-import { UserModel, PlayerModel, TeamModel, ScoutModel } from '@/models/user';
+import { UserModel } from '@/models/user';
+import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 
-// Define validation schema
+// Define the request body schema
 const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-  role: z.enum(['player', 'team', 'scout']),
+  role: z.enum(['player', 'team', 'scout']).default('player'),
 });
+
+// Define types based on the schema
+type RegisterRequest = z.infer<typeof registerSchema>;
+
+interface ValidationError {
+  path: (string | number)[];
+  message: string;
+}
 
 export async function POST(req: NextRequest) {
   try {
     // Connect to database
     await dbConnect();
 
-    // Parse and validate request body
+    // Get request body
     const body = await req.json();
-    console.log('Registration request body:', { ...body, password: '***' });
-    
-    const validation = registerSchema.safeParse(body);
 
-    if (!validation.success) {
+    // Validate request body
+    const result = registerSchema.safeParse(body);
+    if (!result.success) {
+      const errors: ValidationError[] = result.error.errors.map((error) => ({
+        path: error.path,
+        message: error.message,
+      }));
       return NextResponse.json(
-        { message: validation.error.errors[0].message },
+        { errors },
         { status: 400 }
       );
     }
 
-    const { name, email, password, role } = validation.data;
+    const { name, email, password, role } = result.data;
 
     // Check if user already exists
     const existingUser = await UserModel.findOne({ email });
     if (existingUser) {
       return NextResponse.json(
-        { message: 'User with this email already exists' },
+        { error: 'User already exists' },
         { status: 400 }
       );
     }
 
-    // Create user based on role
-    let user;
-    // Create the base user data without the role field
-    // When using discriminators, the role is determined by which model we use
-    const userData = {
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    // Create user
+    const user = await UserModel.create({
       name,
       email,
-      password,
-      // Don't include role here as it's handled by the discriminator
-    };
+      password: hashedPassword,
+      role,
+    });
 
-    console.log('Creating user with data:', { ...userData, password: '***', role });
+    // Return success response
+    return NextResponse.json(
+      {
+        user: {
+          id: user._id.toString(),
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        },
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    // Log the error for debugging
+    console.error('Registration error:', error);
 
-    try {
-      switch (role) {
-        case 'player':
-          user = new PlayerModel(userData);
-          await user.save();
-          break;
-        case 'team':
-          user = new TeamModel(userData);
-          await user.save();
-          break;
-        case 'scout':
-          user = new ScoutModel(userData);
-          await user.save();
-          break;
-        default:
-          return NextResponse.json(
-            { message: 'Invalid role' },
-            { status: 400 }
-          );
-      }
-    } catch (saveError: any) {
-      console.error('Error saving user:', saveError);
+    // Return error response
+    if (error instanceof Error) {
       return NextResponse.json(
-        { message: `Error creating user: ${saveError.message || 'Unknown error'}` },
+        { error: error.message },
         { status: 500 }
       );
     }
 
-    // Return success response (exclude password)
-    const userResponse = {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    };
-
     return NextResponse.json(
-      { message: 'User registered successfully', user: userResponse },
-      { status: 201 }
-    );
-  } catch (error: any) {
-    console.error('Registration error:', error);
-    return NextResponse.json(
-      { message: 'Internal server error', details: error.message || 'Unknown error' },
+      { error: 'An unexpected error occurred' },
       { status: 500 }
     );
   }
