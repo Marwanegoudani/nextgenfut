@@ -64,6 +64,19 @@ export interface PlayerProfile extends User {
   nationality: string;
   averageRating?: number;
   matchesPlayed: number;
+  availability?: PlayerAvailability;
+}
+
+export interface PlayerAvailability {
+  isAvailable: boolean;
+  availableUntil?: Date;
+  preferredPositions?: ('GK' | 'DEF' | 'MID' | 'FWD')[];
+  maxDistance?: number; // in km
+  location?: {
+    latitude: number;
+    longitude: number;
+  };
+  lastUpdated: Date;
 }
 
 export interface ScoutProfile extends User {

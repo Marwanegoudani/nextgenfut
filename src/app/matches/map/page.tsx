@@ -2,17 +2,16 @@ import { Suspense } from 'react';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { MatchListClient } from '@/components/matches/MatchListClient';
+import { MatchMapViewClient } from '@/components/maps/MatchMapViewClient';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { MatchService } from '@/services/match.service';
 import { Match } from '@/types';
 import dbConnect from '@/lib/db';
-import { MapPin } from 'lucide-react';
 
 export const metadata = {
-  title: 'Matches | NextGenFut',
-  description: 'View and join football matches',
+  title: 'Match Map | NextGenFut',
+  description: 'Find matches near you',
 };
 
 // Helper function to serialize dates and remove MongoDB specific fields
@@ -47,78 +46,43 @@ function serializeMatch(match: any): Match {
   };
 }
 
-async function getMatches(searchParams: Promise<{
-  page?: string;
-  status?: string;
-  city?: string;
-}>) {
+async function getMatches() {
   // Ensure database connection is established
   await dbConnect();
   
-  const params = await searchParams;
-  const page = parseInt(params.page || '1', 10);
-  const limit = 10;
-  const skip = (page - 1) * limit;
-
-  const filters: any = {
-    limit,
-    skip,
-  };
-
-  if (params.status) {
-    filters.status = params.status;
-  }
-
-  if (params.city) {
-    filters.city = params.city;
-  }
-
   try {
-    const { matches, total } = await MatchService.getMatches(filters);
+    const { matches } = await MatchService.getMatches({
+      status: 'scheduled', // Only show scheduled matches on the map
+    });
     
     // Serialize matches before returning
-    return {
-      matches: matches.map(serializeMatch),
-      total,
-    };
+    return matches.map(serializeMatch);
   } catch (error) {
     console.error('Error fetching matches:', error);
-    return {
-      matches: [],
-      total: 0,
-    };
+    return [];
   }
 }
 
-export default async function MatchesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ page?: string; status?: string; city?: string }>;
-}) {
+export default async function MatchMapPage() {
   const session = await getServerSession(authOptions);
   if (!session) {
     redirect('/auth/login');
   }
 
-  const { matches, total } = await getMatches(searchParams);
-  const params = await searchParams;
-  const currentPage = parseInt(params.page || '1', 10);
+  const matches = await getMatches();
 
   return (
     <main className="container mx-auto py-8 px-4">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold">Football Matches</h1>
+          <h1 className="text-3xl font-bold">Find Matches Near You</h1>
           <p className="text-gray-500 mt-2">
-            Find and join matches in your area
+            Discover football matches in your area
           </p>
         </div>
         <div className="flex gap-4">
-          <Link href="/matches/map" passHref>
-            <Button variant="outline" className="flex items-center gap-2">
-              <MapPin className="h-4 w-4" />
-              Map View
-            </Button>
+          <Link href="/matches" passHref>
+            <Button variant="outline">List View</Button>
           </Link>
           <Link href="/matches/create" passHref>
             <Button>Create Match</Button>
@@ -128,14 +92,10 @@ export default async function MatchesPage({
 
       <Suspense
         fallback={
-          <div className="text-center py-12">Loading matches...</div>
+          <div className="text-center py-12">Loading map...</div>
         }
       >
-        <MatchListClient
-          initialMatches={matches}
-          initialTotal={total}
-          initialPage={currentPage}
-        />
+        <MatchMapViewClient initialMatches={matches} />
       </Suspense>
     </main>
   );

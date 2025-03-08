@@ -24,6 +24,17 @@ export interface IPlayer extends IUser {
   dominantFoot?: 'left' | 'right' | 'both';
   averageRating?: number;
   matchesPlayed?: number;
+  availability?: {
+    isAvailable: boolean;
+    availableUntil?: Date;
+    preferredPositions?: string[];
+    maxDistance?: number;
+    location?: {
+      latitude: number;
+      longitude: number;
+    };
+    lastUpdated: Date;
+  };
 }
 
 // Team specific fields
@@ -112,6 +123,20 @@ const PlayerSchema = new Schema<IPlayer>({
   matchesPlayed: {
     type: Number,
     default: 0,
+  },
+  availability: {
+    isAvailable: {
+      type: Boolean,
+      default: false,
+    },
+    availableUntil: Date,
+    preferredPositions: [String],
+    maxDistance: Number,
+    location: {
+      latitude: Number,
+      longitude: Number,
+    },
+    lastUpdated: Date,
   },
 });
 
