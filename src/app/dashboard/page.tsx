@@ -21,11 +21,11 @@ interface PlayerWithAvailability {
 async function getUserAvailability(userId: string): Promise<PlayerAvailability | undefined> {
   await dbConnect();
   
-  const player = await UserModel.findOne({ _id: userId, role: 'player' })
+  const user = await UserModel.findById(userId)
     .select('availability')
     .lean() as PlayerWithAvailability;
     
-  return player?.availability;
+  return user?.availability;
 }
 
 export default async function DashboardPage() {

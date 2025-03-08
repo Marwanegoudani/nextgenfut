@@ -110,8 +110,9 @@ export function PlayerAvailabilityToggle({
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update availability');
+        const errorData = await response.json();
+        console.error('Error details:', errorData);
+        throw new Error(errorData.error || 'Failed to update availability');
       }
 
       setIsAvailable(!isAvailable);

@@ -51,19 +51,19 @@ export async function GET(
       );
     }
     
-    // Get player from database
-    const player = await UserModel.findOne({ _id: id, role: 'player' })
+    // Get user from database - remove the role filter
+    const user = await UserModel.findById(id)
       .select('availability')
       .lean() as PlayerWithAvailability;
       
-    if (!player) {
+    if (!user) {
       return NextResponse.json(
-        { error: 'Player not found' },
+        { error: 'User not found' },
         { status: 404 }
       );
     }
     
-    return NextResponse.json({ availability: player.availability || null });
+    return NextResponse.json({ availability: user.availability || null });
   } catch (error) {
     console.error('Failed to get player availability:', error);
     return NextResponse.json(
@@ -103,23 +103,21 @@ export async function PUT(
     const body = await request.json();
     const validatedData = availabilitySchema.parse(body);
     
-    // Update player availability
-    const player = await UserModel.findOneAndUpdate(
-      { _id: id, role: 'player' },
+    // Update user availability - remove the role filter
+    const user = await UserModel.findByIdAndUpdate(
+      id,
       { availability: validatedData },
       { new: true }
-    )
-      .select('availability')
-      .lean() as PlayerWithAvailability;
+    ).select('availability');
     
-    if (!player) {
+    if (!user) {
       return NextResponse.json(
-        { error: 'Player not found' },
+        { error: 'User not found' },
         { status: 404 }
       );
     }
     
-    return NextResponse.json({ availability: player.availability });
+    return NextResponse.json({ availability: user.availability });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
