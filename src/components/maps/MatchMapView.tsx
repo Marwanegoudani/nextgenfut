@@ -8,6 +8,7 @@ import { Slider } from '@/components/ui/slider';
 import { loadGoogleMapsApi } from '@/lib/google-maps';
 import { Loader2, MapPin, Navigation } from 'lucide-react';
 import { MatchCard } from '@/components/matches/MatchCard';
+import { toast } from 'sonner';
 
 interface MatchMapViewProps {
   matches: Match[];
@@ -74,8 +75,35 @@ export function MatchMapView({ matches, onJoinMatch, onViewDetails }: MatchMapVi
                   title: 'Your Location',
                 });
               },
-              () => {
-                setError('Unable to get your location. Using default location.');
+              (error) => {
+                // Provide more specific error messages based on the error code
+                let errorMessage = 'Unable to get your location. Using default location.';
+                
+                switch(error.code) {
+                  case error.PERMISSION_DENIED:
+                    errorMessage = 'Location access was denied. Please enable location permissions in your browser settings.';
+                    break;
+                  case error.POSITION_UNAVAILABLE:
+                    errorMessage = 'Location information is unavailable. Using default location.';
+                    break;
+                  case error.TIMEOUT:
+                    errorMessage = 'Location request timed out. Using default location.';
+                    break;
+                }
+                
+                setError(errorMessage);
+                
+                // Use sonner toast instead
+                toast.error("Location access required", {
+                  description: "For the best experience, please allow location access when prompted by your browser.",
+                  duration: 5000,
+                });
+              },
+              // Add options with longer timeout and high accuracy
+              { 
+                enableHighAccuracy: true, 
+                timeout: 10000, 
+                maximumAge: 0 
               }
             );
           }
@@ -248,9 +276,20 @@ export function MatchMapView({ matches, onJoinMatch, onViewDetails }: MatchMapVi
           
           {error && (
             <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 z-10">
-              <div className="text-center p-4">
-                <p className="text-red-500 mb-2">{error}</p>
-                <Button onClick={() => setError(null)}>Dismiss</Button>
+              <div className="text-center p-6 max-w-md bg-white rounded-lg shadow-lg">
+                <div className="text-red-500 mb-4 text-lg font-medium">{error}</div>
+                <p className="mb-4 text-gray-600">
+                  This app uses your location to find matches and players nearby. 
+                  Without location access, we'll use a default location, but your experience will be limited.
+                </p>
+                <div className="space-y-2">
+                  <Button onClick={handleGetCurrentLocation} className="w-full">
+                    Try Again
+                  </Button>
+                  <Button onClick={() => setError(null)} variant="outline" className="w-full">
+                    Continue with Default Location
+                  </Button>
+                </div>
               </div>
             </div>
           )}
