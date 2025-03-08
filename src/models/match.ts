@@ -1,78 +1,70 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema } from 'mongoose';
+import { Match } from '@/types';
 
-export interface IMatch extends Document {
-  title: string;
-  description?: string;
-  location: string;
-  date: Date;
-  time: string;
-  duration: number; // in minutes
-  maxPlayers: number;
-  players: mongoose.Types.ObjectId[];
-  status: 'upcoming' | 'ongoing' | 'completed';
-  createdBy: mongoose.Types.ObjectId;
-  createdAt: Date;
-  updatedAt: Date;
-}
+const locationSchema = new Schema({
+  name: { type: String, required: true },
+  address: { type: String, required: true },
+  city: { type: String, required: true },
+  coordinates: {
+    latitude: { type: Number, required: true },
+    longitude: { type: Number, required: true },
+  },
+});
 
-const MatchSchema = new Schema<IMatch>(
+const matchSchema = new Schema<Match>(
   {
-    title: {
-      type: String,
-      required: [true, 'Please provide a title'],
-      trim: true,
-      maxlength: [100, 'Title cannot be more than 100 characters'],
+    id: { type: String, required: true, default: () => new mongoose.Types.ObjectId().toString() },
+    date: { type: Date, required: true },
+    location: { type: locationSchema, required: true },
+    teams: {
+      home: [{ type: String, ref: 'User' }],
+      away: [{ type: String, ref: 'User' }],
     },
-    description: {
-      type: String,
-      maxlength: [500, 'Description cannot be more than 500 characters'],
-    },
-    location: {
-      type: String,
-      required: [true, 'Please provide a location'],
-    },
-    date: {
-      type: Date,
-      required: [true, 'Please provide a date'],
-    },
-    time: {
-      type: String,
-      required: [true, 'Please provide a time'],
-    },
-    duration: {
-      type: Number,
-      required: [true, 'Please provide a duration'],
-      min: [30, 'Duration must be at least 30 minutes'],
-      max: [180, 'Duration cannot be more than 180 minutes'],
-    },
-    maxPlayers: {
-      type: Number,
-      required: [true, 'Please provide a maximum number of players'],
-      min: [2, 'At least 2 players are required'],
-      max: [22, 'Maximum 22 players are allowed'],
-    },
-    players: [{
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-    }],
     status: {
       type: String,
-      enum: ['upcoming', 'ongoing', 'completed'],
-      default: 'upcoming',
+      enum: ['scheduled', 'in-progress', 'completed'],
+      default: 'scheduled',
     },
-    createdBy: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: [true, 'Please provide a user'],
+    scores: {
+      home: { type: Number, default: 0 },
+      away: { type: Number, default: 0 },
     },
+    createdBy: { type: String, ref: 'User', required: true },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toObject: {
+      transform: (_, ret) => {
+        ret.id = ret._id.toString();
+        delete ret._id;
+        delete ret.__v;
+        return ret;
+      },
+    },
+    toJSON: {
+      transform: (_, ret) => {
+        ret.id = ret._id.toString();
+        delete ret._id;
+        delete ret.__v;
+        return ret;
+      },
+    },
+  }
 );
 
-// Create a compound index for date and location
-MatchSchema.index({ date: 1, location: 1 });
+// Indexes for better query performance
+matchSchema.index({ date: 1 });
+matchSchema.index({ status: 1 });
+matchSchema.index({ 'location.city': 1 });
+matchSchema.index({ createdBy: 1 });
 
-// Create a model
-const MatchModel = mongoose.models.Match || mongoose.model<IMatch>('Match', MatchSchema);
+// Virtual populate for ratings
+matchSchema.virtual('ratings', {
+  ref: 'Rating',
+  localField: '_id',
+  foreignField: 'matchId',
+});
+
+const MatchModel = mongoose.models.Match || mongoose.model<Match>('Match', matchSchema);
 
 export default MatchModel; 

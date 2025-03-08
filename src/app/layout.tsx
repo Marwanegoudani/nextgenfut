@@ -5,6 +5,7 @@ import Link from "next/link";
 import Providers from "./providers";
 import Logo from "@/components/ui/Logo";
 import Favicon from "@/components/ui/Favicon";
+import { Toaster } from 'sonner';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -84,6 +85,7 @@ export default function RootLayout({
             </div>
           </footer>
         </Providers>
+        <Toaster />
       </body>
     </html>
   );

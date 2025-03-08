@@ -1,50 +1,119 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema } from 'mongoose';
+import { Rating } from '@/types';
 
-export interface IRating extends Document {
-  matchId: mongoose.Types.ObjectId;
-  ratedBy: mongoose.Types.ObjectId;
-  ratedPlayer: mongoose.Types.ObjectId;
-  rating: number; // 1-5
-  comment?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+const skillsSchema = new Schema({
+  pace: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 10,
+  },
+  shooting: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 10,
+  },
+  passing: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 10,
+  },
+  dribbling: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 10,
+  },
+  defending: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 10,
+  },
+  physical: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 10,
+  },
+});
 
-const RatingSchema = new Schema<IRating>(
+const ratingSchema = new Schema<Rating>(
   {
+    id: { type: String, required: true, default: () => new mongoose.Types.ObjectId().toString() },
     matchId: {
-      type: Schema.Types.ObjectId,
-      ref: 'Match',
-      required: [true, 'Please provide a match'],
-    },
-    ratedBy: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: [true, 'Please provide a user who rated'],
-    },
-    ratedPlayer: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: [true, 'Please provide a player who was rated'],
-    },
-    rating: {
-      type: Number,
-      required: [true, 'Please provide a rating'],
-      min: [1, 'Rating must be at least 1'],
-      max: [5, 'Rating cannot be more than 5'],
-    },
-    comment: {
       type: String,
-      maxlength: [500, 'Comment cannot be more than 500 characters'],
+      ref: 'Match',
+      required: true,
+    },
+    playerId: {
+      type: String,
+      ref: 'User',
+      required: true,
+    },
+    raterId: {
+      type: String,
+      ref: 'User',
+      required: true,
+    },
+    skills: {
+      type: skillsSchema,
+      required: true,
+    },
+    comments: {
+      type: String,
+      maxlength: 500,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toObject: {
+      transform: (_, ret) => {
+        ret.id = ret._id.toString();
+        delete ret._id;
+        delete ret.__v;
+        return ret;
+      },
+    },
+    toJSON: {
+      transform: (_, ret) => {
+        ret.id = ret._id.toString();
+        delete ret._id;
+        delete ret.__v;
+        return ret;
+      },
+    },
+  }
 );
 
-// Create a compound index to ensure a user can only rate a player once per match
-RatingSchema.index({ matchId: 1, ratedBy: 1, ratedPlayer: 1 }, { unique: true });
+// Indexes for better query performance
+ratingSchema.index({ matchId: 1 });
+ratingSchema.index({ playerId: 1 });
+ratingSchema.index({ raterId: 1 });
 
-// Create a model
-const RatingModel = mongoose.models.Rating || mongoose.model<IRating>('Rating', RatingSchema);
+// Compound index for unique ratings per match/player/rater combination
+ratingSchema.index(
+  { matchId: 1, playerId: 1, raterId: 1 },
+  { unique: true }
+);
+
+// Virtual for average rating
+ratingSchema.virtual('averageRating').get(function() {
+  if (!this.skills) return '0.0';
+  const values = [
+    this.skills.pace,
+    this.skills.shooting,
+    this.skills.passing,
+    this.skills.dribbling,
+    this.skills.defending,
+    this.skills.physical,
+  ];
+  const sum = values.reduce((a, b) => a + b, 0);
+  return (sum / 6).toFixed(1);
+});
+
+const RatingModel = mongoose.models.Rating || mongoose.model<Rating>('Rating', ratingSchema);
 
 export default RatingModel; 
