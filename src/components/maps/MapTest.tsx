@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { loadGoogleMapsApi, getGoogleMapsApiStatus } from '@/lib/google-maps';
 
 export function MapTest() {
   const [apiStatus, setApiStatus] = useState<{
@@ -27,32 +28,22 @@ export function MapTest() {
       return;
     }
 
-    // Load Google Maps JavaScript API
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-    script.async = true;
-    script.defer = true;
-    
-    script.onload = () => {
-      setApiStatus(prev => ({
-        ...prev,
-        loaded: true,
-        placesAvailable: !!window.google?.maps?.places
-      }));
-    };
-
-    script.onerror = () => {
-      setApiStatus(prev => ({
-        ...prev,
-        error: 'Failed to load Google Maps API'
-      }));
-    };
-
-    document.head.appendChild(script);
-
-    return () => {
-      document.head.removeChild(script);
-    };
+    // Load Google Maps API
+    loadGoogleMapsApi()
+      .then(() => {
+        setApiStatus({
+          loaded: true,
+          error: null,
+          placesAvailable: !!window.google?.maps?.places
+        });
+      })
+      .catch((error: unknown) => {
+        setApiStatus({
+          loaded: false,
+          error: error instanceof Error ? error.message : 'Failed to load Google Maps API',
+          placesAvailable: false
+        });
+      });
   }, []);
 
   const testPlacesAPI = async () => {
@@ -81,7 +72,7 @@ export function MapTest() {
 
       setSearchResult(JSON.stringify(results, null, 2));
     } catch (error) {
-      setSearchResult(`Error: ${error.message}`);
+      setSearchResult(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 

@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Input } from './input';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from './command';
-import { Popover, PopoverContent, PopoverTrigger } from './popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from './custom-command';
+import { Popover, PopoverContent, PopoverTrigger } from './custom-popover';
 import { cn } from '@/lib/utils';
 import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
+import { loadGoogleMapsApi } from '@/lib/google-maps';
 
 export interface Location {
   name: string;
@@ -34,44 +35,61 @@ export function LocationAutocomplete({
   const [value, setValue] = useState(defaultValue || '');
   const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
   const placesService = useRef<google.maps.places.PlacesService | null>(null);
   const mapRef = useRef<HTMLDivElement | null>(null);
+  const mapDivCreated = useRef(false);
 
   useEffect(() => {
-    // Create a hidden map div for PlacesService
+    let mapDiv: HTMLDivElement | null = null;
+
+    // Create a hidden map div for PlacesService if it doesn't exist
     if (!mapRef.current) {
-      const mapDiv = document.createElement('div');
+      mapDiv = document.createElement('div');
       mapDiv.style.display = 'none';
       document.body.appendChild(mapDiv);
       mapRef.current = mapDiv;
+      mapDivCreated.current = true;
     }
 
-    // Load Google Maps JavaScript API
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      autocompleteService.current = new google.maps.places.AutocompleteService();
-      placesService.current = new google.maps.places.PlacesService(mapRef.current!);
-    };
-    document.head.appendChild(script);
+    // Load Google Maps API
+    loadGoogleMapsApi()
+      .then(() => {
+        if (mapRef.current) {
+          autocompleteService.current = new google.maps.places.AutocompleteService();
+          placesService.current = new google.maps.places.PlacesService(mapRef.current);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load Google Maps API:', err);
+        setError('Failed to load location search. Please try again later.');
+      });
 
+    // Cleanup function
     return () => {
-      if (mapRef.current) {
-        document.body.removeChild(mapRef.current);
-      }
-      const scriptElement = document.querySelector(`script[src^="https://maps.googleapis.com/maps/api/js"]`);
-      if (scriptElement) {
-        document.head.removeChild(scriptElement);
+      if (mapDivCreated.current && mapRef.current) {
+        try {
+          // Check if the element is still in the document
+          if (document.body.contains(mapRef.current)) {
+            document.body.removeChild(mapRef.current);
+          }
+        } catch (error) {
+          console.error('Error cleaning up map div:', error);
+        }
+        mapRef.current = null;
+        mapDivCreated.current = false;
       }
     };
   }, []);
 
   const handlePlaceSelect = async (placeId: string) => {
-    if (!placesService.current) return;
+    if (!placesService.current) {
+      setError('Location service not available');
+      return;
+    }
 
+    setLoading(true);
     try {
       const place = await new Promise<google.maps.places.PlaceResult>((resolve, reject) => {
         placesService.current!.getDetails(
@@ -109,8 +127,12 @@ export function LocationAutocomplete({
       onLocationSelect(location);
       setOpen(false);
       setPredictions([]);
+      setError(null);
     } catch (error) {
       console.error('Error getting place details:', error);
+      setError('Failed to get location details');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -129,11 +151,13 @@ export function LocationAutocomplete({
           {
             input: searchText,
             componentRestrictions: { country: 'FR' },
-            types: ['address', 'establishment', 'geocode'],
+            types: ['establishment'], // Use only establishment type for better compatibility
           },
           (predictions, status) => {
             if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
               resolve(predictions);
+            } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+              resolve([]); // Return empty array for no results
             } else {
               reject(new Error(`Autocomplete failed: ${status}`));
             }
@@ -141,8 +165,10 @@ export function LocationAutocomplete({
         );
       });
       setPredictions(results);
+      setError(null);
     } catch (error) {
       console.error('Error getting predictions:', error);
+      setError('Failed to get location suggestions');
       setPredictions([]);
     } finally {
       setLoading(false);
@@ -166,8 +192,8 @@ export function LocationAutocomplete({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </div>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-        <Command>
+      <PopoverContent className="p-0" align="start">
+        <Command shouldFilter={false}>
           <CommandInput
             placeholder="Search location..."
             value={value}
@@ -178,6 +204,8 @@ export function LocationAutocomplete({
               <div className="flex items-center justify-center py-6">
                 <Loader2 className="h-4 w-4 animate-spin" />
               </div>
+            ) : error ? (
+              <div className="text-destructive py-6 px-4 text-center">{error}</div>
             ) : (
               'No locations found.'
             )}
