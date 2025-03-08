@@ -46,15 +46,16 @@ function serializeMatch(match: any): Match {
   };
 }
 
-async function getMatches(searchParams: {
+async function getMatches(searchParams: Promise<{
   page?: string;
   status?: string;
   city?: string;
-}) {
+}>) {
   // Ensure database connection is established
   await dbConnect();
   
-  const page = parseInt(searchParams.page || '1', 10);
+  const params = await searchParams;
+  const page = parseInt(params.page || '1', 10);
   const limit = 10;
   const skip = (page - 1) * limit;
 
@@ -63,12 +64,12 @@ async function getMatches(searchParams: {
     skip,
   };
 
-  if (searchParams.status) {
-    filters.status = searchParams.status;
+  if (params.status) {
+    filters.status = params.status;
   }
 
-  if (searchParams.city) {
-    filters.city = searchParams.city;
+  if (params.city) {
+    filters.city = params.city;
   }
 
   try {
@@ -91,7 +92,7 @@ async function getMatches(searchParams: {
 export default async function MatchesPage({
   searchParams,
 }: {
-  searchParams: { page?: string; status?: string; city?: string };
+  searchParams: Promise<{ page?: string; status?: string; city?: string }>;
 }) {
   const session = await getServerSession(authOptions);
   if (!session) {
@@ -99,7 +100,8 @@ export default async function MatchesPage({
   }
 
   const { matches, total } = await getMatches(searchParams);
-  const currentPage = parseInt(searchParams.page || '1', 10);
+  const params = await searchParams;
+  const currentPage = parseInt(params.page || '1', 10);
 
   return (
     <main className="container mx-auto py-8 px-4">
