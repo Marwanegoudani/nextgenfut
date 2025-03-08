@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { LocationAutocomplete, Location } from '@/components/ui/location-autocomplete';
 
 const createMatchSchema = z.object({
   date: z.string().min(1, 'Date is required'),
@@ -53,6 +54,10 @@ export function CreateMatchForm({ onSubmit }: CreateMatchFormProps) {
       },
     },
   });
+
+  const handleLocationSelect = (location: Location) => {
+    form.setValue('location', location, { shouldValidate: true });
+  };
 
   const handleSubmit = async (data: FormData) => {
     try {
@@ -102,93 +107,21 @@ export function CreateMatchForm({ onSubmit }: CreateMatchFormProps) {
 
         <FormField
           control={form.control}
-          name="location.name"
-          render={({ field }) => (
+          name="location"
+          render={() => (
             <FormItem>
-              <FormLabel>Location Name</FormLabel>
+              <FormLabel>Location</FormLabel>
               <FormControl>
-                <Input placeholder="e.g., Central Park Football Ground" {...field} />
+                <LocationAutocomplete
+                  onLocationSelect={handleLocationSelect}
+                  placeholder="Search for a location..."
+                  defaultValue={form.getValues('location.address')}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-
-        <FormField
-          control={form.control}
-          name="location.address"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Address</FormLabel>
-              <FormControl>
-                <Input placeholder="Street address" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <FormField
-            control={form.control}
-            name="location.city"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>City</FormLabel>
-                <FormControl>
-                  <Input placeholder="City" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <div className="grid grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="location.coordinates.latitude"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Latitude</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="any"
-                      placeholder="Latitude"
-                      {...field}
-                      onChange={(e) =>
-                        field.onChange(parseFloat(e.target.value))
-                      }
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="location.coordinates.longitude"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Longitude</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="any"
-                      placeholder="Longitude"
-                      {...field}
-                      onChange={(e) =>
-                        field.onChange(parseFloat(e.target.value))
-                      }
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-        </div>
 
         <Button type="submit" className="w-full" disabled={isLoading}>
           {isLoading ? 'Creating...' : 'Create Match'}
