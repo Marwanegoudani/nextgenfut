@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { MatchService } from '@/services/match.service';
 import { Match } from '@/types';
+import dbConnect from '@/lib/db';
 
 export const metadata = {
   title: 'Matches | NextGenFut',
@@ -50,6 +51,9 @@ async function getMatches(searchParams: {
   status?: string;
   city?: string;
 }) {
+  // Ensure database connection is established
+  await dbConnect();
+  
   const page = parseInt(searchParams.page || '1', 10);
   const limit = 10;
   const skip = (page - 1) * limit;
@@ -67,13 +71,21 @@ async function getMatches(searchParams: {
     filters.city = searchParams.city;
   }
 
-  const { matches, total } = await MatchService.getMatches(filters);
-  
-  // Serialize matches before returning
-  return {
-    matches: matches.map(serializeMatch),
-    total,
-  };
+  try {
+    const { matches, total } = await MatchService.getMatches(filters);
+    
+    // Serialize matches before returning
+    return {
+      matches: matches.map(serializeMatch),
+      total,
+    };
+  } catch (error) {
+    console.error('Error fetching matches:', error);
+    return {
+      matches: [],
+      total: 0,
+    };
+  }
 }
 
 export default async function MatchesPage({

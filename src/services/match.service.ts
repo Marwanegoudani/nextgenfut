@@ -2,15 +2,26 @@ import { Match, Location } from '@/types';
 import MatchModel from '@/models/match';
 import { Types } from 'mongoose';
 
-// Utility function to wrap promises with timeout
-const withTimeout = <T>(promise: Promise<T>, timeoutMs: number = 15000): Promise<T> => {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => 
-      setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs)
-    )
-  ]);
-};
+// Utility function to add retry logic
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  delay: number = 1000
+): Promise<T> {
+  let lastError: Error;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error as Error;
+      if (i < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i))); // Exponential backoff
+        console.log(`Retrying operation (attempt ${i + 2}/${maxRetries})...`);
+      }
+    }
+  }
+  throw lastError!;
+}
 
 export class MatchService {
   // Create a new match
@@ -19,35 +30,40 @@ export class MatchService {
     location: Location,
     createdBy: string
   ): Promise<Match> {
-    try {
-      const match = await MatchModel.create({
-        date,
-        location,
-        teams: { home: [], away: [] },
-        scores: { home: 0, away: 0 },
-        status: 'scheduled',
-        createdBy,
-      });
+    return withRetry(async () => {
+      try {
+        const match = await MatchModel.create({
+          date,
+          location,
+          teams: { home: [], away: [] },
+          scores: { home: 0, away: 0 },
+          status: 'scheduled',
+          createdBy,
+        });
 
-      return match.toObject() as Match;
-    } catch (error) {
-      throw new Error(`Failed to create match: ${(error as Error).message}`);
-    }
+        return match.toObject() as Match;
+      } catch (error) {
+        throw new Error(`Failed to create match: ${(error as Error).message}`);
+      }
+    });
   }
 
   // Get match by ID
   static async getMatchById(id: string): Promise<Match | null> {
-    try {
-      const match = await MatchModel.findById(id)
-        .populate('teams.home', 'name')
-        .populate('teams.away', 'name')
-        .populate('createdBy', 'name')
-        .lean();
+    return withRetry(async () => {
+      try {
+        const match = await MatchModel.findById(id)
+          .maxTimeMS(15000) // Set 15s timeout
+          .populate('teams.home', 'name')
+          .populate('teams.away', 'name')
+          .populate('createdBy', 'name')
+          .lean();
 
-      return match ? (match as unknown as Match) : null;
-    } catch (error) {
-      throw new Error(`Failed to get match: ${(error as Error).message}`);
-    }
+        return match ? (match as unknown as Match) : null;
+      } catch (error) {
+        throw new Error(`Failed to get match: ${(error as Error).message}`);
+      }
+    });
   }
 
   // Get matches with filters
@@ -58,62 +74,54 @@ export class MatchService {
     limit?: number;
     skip?: number;
   }): Promise<{ matches: Match[]; total: number }> {
-    try {
-      const query: Record<string, any> = {};
+    return withRetry(async () => {
+      try {
+        const query: Record<string, any> = {};
 
-      if (filters.status) {
-        query.status = filters.status;
-      }
+        if (filters.status) {
+          query.status = filters.status;
+        }
 
-      if (filters.city) {
-        query['location.city'] = filters.city;
-      }
+        if (filters.city) {
+          query['location.city'] = filters.city;
+        }
 
-      if (filters.date) {
-        query.date = {
-          $gte: filters.date.start,
-          $lte: filters.date.end,
-        };
-      }
+        if (filters.date) {
+          query.date = {
+            $gte: filters.date.start,
+            $lte: filters.date.end,
+          };
+        }
 
-      // Set reasonable defaults for pagination
-      const limit = filters.limit || 10;
-      const skip = filters.skip || 0;
+        // Set reasonable defaults for pagination
+        const limit = filters.limit || 10;
+        const skip = filters.skip || 0;
 
-      // Execute queries with timeout
-      const [matches, total] = await Promise.all([
-        withTimeout(
+        const [matches, total] = await Promise.all([
           MatchModel.find(query)
+            .maxTimeMS(15000) // Set 15s timeout
             .sort({ date: 1 })
             .skip(skip)
             .limit(limit)
             .populate('teams.home', 'name')
             .populate('teams.away', 'name')
             .populate('createdBy', 'name')
-            .lean()
-            .exec()
-        ),
-        withTimeout(
-          MatchModel.countDocuments(query).exec()
-        )
-      ]);
+            .lean(),
+          MatchModel.countDocuments(query).maxTimeMS(15000), // Set 15s timeout
+        ]);
 
-      // Add better error handling for empty results
-      if (!matches) {
-        return { matches: [], total: 0 };
+        return {
+          matches: matches as unknown as Match[],
+          total,
+        };
+      } catch (error) {
+        const errorMessage = (error as Error).message;
+        if (errorMessage.includes('buffering timed out')) {
+          throw new Error('Database operation timed out. Please try again.');
+        }
+        throw new Error(`Failed to get matches: ${errorMessage}`);
       }
-
-      return {
-        matches: matches as unknown as Match[],
-        total,
-      };
-    } catch (error) {
-      console.error('Error in getMatches:', error);
-      if (error instanceof Error && error.message.includes('timed out')) {
-        throw new Error('Request timed out. Please try again.');
-      }
-      throw new Error(`Failed to get matches: ${(error as Error).message}`);
-    }
+    });
   }
 
   // Join a match (add player to a team)
@@ -122,32 +130,34 @@ export class MatchService {
     playerId: string,
     team: 'home' | 'away'
   ): Promise<Match> {
-    try {
-      const match = await MatchModel.findById(matchId);
-      if (!match) {
-        throw new Error('Match not found');
+    return withRetry(async () => {
+      try {
+        const match = await MatchModel.findById(matchId).maxTimeMS(15000);
+        if (!match) {
+          throw new Error('Match not found');
+        }
+
+        if (match.status !== 'scheduled') {
+          throw new Error('Cannot join a match that is not in scheduled status');
+        }
+
+        // Check if player is already in any team
+        const isInHome = match.teams.home.includes(playerId);
+        const isInAway = match.teams.away.includes(playerId);
+        
+        if (isInHome || isInAway) {
+          throw new Error('Player is already in a team');
+        }
+
+        // Add player to selected team
+        match.teams[team].push(playerId);
+        await match.save();
+
+        return match.toObject() as Match;
+      } catch (error) {
+        throw new Error(`Failed to join match: ${(error as Error).message}`);
       }
-
-      if (match.status !== 'scheduled') {
-        throw new Error('Cannot join a match that is not in scheduled status');
-      }
-
-      // Check if player is already in any team
-      const isInHome = match.teams.home.includes(playerId);
-      const isInAway = match.teams.away.includes(playerId);
-      
-      if (isInHome || isInAway) {
-        throw new Error('Player is already in a team');
-      }
-
-      // Add player to selected team
-      match.teams[team].push(playerId);
-      await match.save();
-
-      return match.toObject() as Match;
-    } catch (error) {
-      throw new Error(`Failed to join match: ${(error as Error).message}`);
-    }
+    });
   }
 
   // Update match status and scores
@@ -156,33 +166,37 @@ export class MatchService {
     status: 'scheduled' | 'in-progress' | 'completed',
     scores?: { home: number; away: number }
   ): Promise<Match> {
-    try {
-      const match = await MatchModel.findById(matchId);
-      if (!match) {
-        throw new Error('Match not found');
-      }
+    return withRetry(async () => {
+      try {
+        const match = await MatchModel.findById(matchId).maxTimeMS(15000);
+        if (!match) {
+          throw new Error('Match not found');
+        }
 
-      match.status = status;
-      if (scores) {
-        match.scores = scores;
-      }
+        match.status = status;
+        if (scores) {
+          match.scores = scores;
+        }
 
-      await match.save();
-      return match.toObject() as Match;
-    } catch (error) {
-      throw new Error(`Failed to update match status: ${(error as Error).message}`);
-    }
+        await match.save();
+        return match.toObject() as Match;
+      } catch (error) {
+        throw new Error(`Failed to update match status: ${(error as Error).message}`);
+      }
+    });
   }
 
   // Delete a match
   static async deleteMatch(matchId: string): Promise<void> {
-    try {
-      const result = await MatchModel.deleteOne({ _id: matchId });
-      if (result.deletedCount === 0) {
-        throw new Error('Match not found');
+    return withRetry(async () => {
+      try {
+        const result = await MatchModel.deleteOne({ _id: matchId }).maxTimeMS(15000);
+        if (result.deletedCount === 0) {
+          throw new Error('Match not found');
+        }
+      } catch (error) {
+        throw new Error(`Failed to delete match: ${(error as Error).message}`);
       }
-    } catch (error) {
-      throw new Error(`Failed to delete match: ${(error as Error).message}`);
-    }
+    });
   }
 } 

@@ -44,13 +44,16 @@ async function dbConnect(): Promise<mongoose.Connection> {
       bufferCommands: false,
       maxPoolSize: 10,
       minPoolSize: 5,
-      socketTimeoutMS: 45000,
-      connectTimeoutMS: 10000,
-      serverSelectionTimeoutMS: 10000,
-      waitQueueTimeoutMS: 10000,
+      socketTimeoutMS: 60000,
+      connectTimeoutMS: 30000,
+      serverSelectionTimeoutMS: 30000,
+      waitQueueTimeoutMS: 30000,
       heartbeatFrequencyMS: 1000,
       retryWrites: true,
       retryReads: true,
+      autoIndex: true,
+      autoCreate: true,
+      family: 4,
     };
 
     console.log('Creating new database connection');
@@ -61,14 +64,24 @@ async function dbConnect(): Promise<mongoose.Connection> {
         // Set up connection event listeners
         mongoose.connection.on('error', (err) => {
           console.error('MongoDB connection error:', err);
+          cached.conn = null;
+          cached.promise = null;
         });
 
         mongoose.connection.on('disconnected', () => {
           console.warn('MongoDB disconnected. Attempting to reconnect...');
+          cached.conn = null;
+          cached.promise = null;
         });
 
         mongoose.connection.on('reconnected', () => {
           console.log('MongoDB reconnected successfully');
+        });
+
+        mongoose.connection.on('timeout', () => {
+          console.error('MongoDB operation timeout. Attempting to reconnect...');
+          cached.conn = null;
+          cached.promise = null;
         });
 
         return mongoose.connection;

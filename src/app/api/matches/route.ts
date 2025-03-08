@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { z } from 'zod';
 import { MatchService } from '@/services/match.service';
 import { authOptions } from '@/lib/auth';
+import dbConnect from '@/lib/db';
 
 // Validation schema for creating a match
 const createMatchSchema = z.object({
@@ -36,47 +37,11 @@ const querySchema = z.object({
     .optional(),
 });
 
-export async function POST(req: NextRequest) {
-  try {
-    // Check authentication
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
-    }
-
-    // Parse and validate request body
-    const body = await req.json();
-    const validatedData = createMatchSchema.parse(body);
-
-    // Create match
-    const match = await MatchService.createMatch(
-      validatedData.date,
-      validatedData.location,
-      session.user.id
-    );
-
-    return NextResponse.json(match, { status: 201 });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid request data', details: error.errors },
-        { status: 400 }
-      );
-    }
-
-    console.error('Failed to create match:', error);
-    return NextResponse.json(
-      { error: 'Failed to create match' },
-      { status: 500 }
-    );
-  }
-}
-
 export async function GET(req: NextRequest) {
   try {
+    // Ensure database connection is established
+    await dbConnect();
+
     // Parse query parameters
     const searchParams = Object.fromEntries(req.nextUrl.searchParams);
     const validatedQuery = querySchema.parse(searchParams);
@@ -106,6 +71,8 @@ export async function GET(req: NextRequest) {
       totalPages: Math.ceil(total / filters.limit),
     });
   } catch (error) {
+    console.error('Error in GET /api/matches:', error);
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: 'Invalid query parameters', details: error.errors },
@@ -113,9 +80,64 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    console.error('Failed to get matches:', error);
+    // Check for specific database timeout errors
+    if (error instanceof Error && error.message.includes('buffering timed out')) {
+      return NextResponse.json(
+        { error: 'Database operation timed out. Please try again.' },
+        { status: 504 }
+      );
+    }
+
     return NextResponse.json(
       { error: 'Failed to get matches' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    // Ensure database connection is established
+    await dbConnect();
+
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const body = await req.json();
+    const validatedData = createMatchSchema.parse(body);
+
+    const match = await MatchService.createMatch(
+      validatedData.date,
+      validatedData.location,
+      session.user.id
+    );
+
+    return NextResponse.json(match);
+  } catch (error) {
+    console.error('Error in POST /api/matches:', error);
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Invalid request data', details: error.errors },
+        { status: 400 }
+      );
+    }
+
+    // Check for specific database timeout errors
+    if (error instanceof Error && error.message.includes('buffering timed out')) {
+      return NextResponse.json(
+        { error: 'Database operation timed out. Please try again.' },
+        { status: 504 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to create match' },
       { status: 500 }
     );
   }

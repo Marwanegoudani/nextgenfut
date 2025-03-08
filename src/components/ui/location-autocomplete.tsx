@@ -36,9 +36,17 @@ export function LocationAutocomplete({
   const [loading, setLoading] = useState(false);
   const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
   const placesService = useRef<google.maps.places.PlacesService | null>(null);
-  const dummyElement = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    // Create a hidden map div for PlacesService
+    if (!mapRef.current) {
+      const mapDiv = document.createElement('div');
+      mapDiv.style.display = 'none';
+      document.body.appendChild(mapDiv);
+      mapRef.current = mapDiv;
+    }
+
     // Load Google Maps JavaScript API
     const script = document.createElement('script');
     script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
@@ -46,56 +54,64 @@ export function LocationAutocomplete({
     script.defer = true;
     script.onload = () => {
       autocompleteService.current = new google.maps.places.AutocompleteService();
-      // Create a dummy div for PlacesService (required)
-      if (!dummyElement.current) {
-        dummyElement.current = document.createElement('div');
-        placesService.current = new google.maps.places.PlacesService(dummyElement.current);
-      }
+      placesService.current = new google.maps.places.PlacesService(mapRef.current!);
     };
     document.head.appendChild(script);
 
     return () => {
-      document.head.removeChild(script);
+      if (mapRef.current) {
+        document.body.removeChild(mapRef.current);
+      }
+      const scriptElement = document.querySelector(`script[src^="https://maps.googleapis.com/maps/api/js"]`);
+      if (scriptElement) {
+        document.head.removeChild(scriptElement);
+      }
     };
   }, []);
 
-  const getPlaceDetails = (placeId: string) => {
+  const handlePlaceSelect = async (placeId: string) => {
     if (!placesService.current) return;
 
-    const request = {
-      placeId,
-      fields: ['name', 'formatted_address', 'geometry', 'address_components'],
-    };
+    try {
+      const place = await new Promise<google.maps.places.PlaceResult>((resolve, reject) => {
+        placesService.current!.getDetails(
+          {
+            placeId,
+            fields: ['name', 'formatted_address', 'geometry', 'address_components'],
+          },
+          (result, status) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && result) {
+              resolve(result);
+            } else {
+              reject(new Error(`Place details failed: ${status}`));
+            }
+          }
+        );
+      });
 
-    placesService.current.getDetails(
-      request,
-      (
-        place: google.maps.places.PlaceResult | null,
-        status: google.maps.places.PlacesServiceStatus
-      ) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-          const city = place.address_components?.find(
-            (component) =>
-              component.types.includes('locality') ||
-              component.types.includes('administrative_area_level_1')
-          )?.long_name;
+      const city = place.address_components?.find(
+        (component) =>
+          component.types.includes('locality') ||
+          component.types.includes('administrative_area_level_1')
+      )?.long_name || '';
 
-          const location: Location = {
-            name: place.name || '',
-            address: place.formatted_address || '',
-            city: city || '',
-            coordinates: {
-              latitude: place.geometry?.location?.lat() || 0,
-              longitude: place.geometry?.location?.lng() || 0,
-            },
-          };
+      const location: Location = {
+        name: place.name || '',
+        address: place.formatted_address || '',
+        city,
+        coordinates: {
+          latitude: place.geometry?.location?.lat() || 0,
+          longitude: place.geometry?.location?.lng() || 0,
+        },
+      };
 
-          onLocationSelect(location);
-          setValue(place.formatted_address || '');
-          setOpen(false);
-        }
-      }
-    );
+      setValue(place.formatted_address || '');
+      onLocationSelect(location);
+      setOpen(false);
+      setPredictions([]);
+    } catch (error) {
+      console.error('Error getting place details:', error);
+    }
   };
 
   const handleSearch = async (searchText: string) => {
@@ -107,26 +123,30 @@ export function LocationAutocomplete({
     }
 
     setLoading(true);
-    const request = {
-      input: searchText,
-      componentRestrictions: { country: 'FR' }, // Restrict to France
-      types: ['establishment', 'geocode'],
-    };
-
-    autocompleteService.current.getPlacePredictions(
-      request,
-      (
-        results: google.maps.places.AutocompletePrediction[] | null,
-        status: google.maps.places.PlacesServiceStatus
-      ) => {
-        setLoading(false);
-        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-          setPredictions(results);
-        } else {
-          setPredictions([]);
-        }
-      }
-    );
+    try {
+      const results = await new Promise<google.maps.places.AutocompletePrediction[]>((resolve, reject) => {
+        autocompleteService.current!.getPlacePredictions(
+          {
+            input: searchText,
+            componentRestrictions: { country: 'FR' },
+            types: ['address', 'establishment', 'geocode'],
+          },
+          (predictions, status) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+              resolve(predictions);
+            } else {
+              reject(new Error(`Autocomplete failed: ${status}`));
+            }
+          }
+        );
+      });
+      setPredictions(results);
+    } catch (error) {
+      console.error('Error getting predictions:', error);
+      setPredictions([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -146,7 +166,7 @@ export function LocationAutocomplete({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </div>
       </PopoverTrigger>
-      <PopoverContent className="w-full p-0" align="start">
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
         <Command>
           <CommandInput
             placeholder="Search location..."
@@ -167,7 +187,8 @@ export function LocationAutocomplete({
               <CommandItem
                 key={prediction.place_id}
                 value={prediction.description}
-                onSelect={() => getPlaceDetails(prediction.place_id)}
+                onSelect={() => handlePlaceSelect(prediction.place_id)}
+                className="cursor-pointer"
               >
                 <Check
                   className={cn(
