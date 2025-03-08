@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { MapPin, Calendar, Users, Star } from 'lucide-react';
 import { format } from 'date-fns';
 import { Match } from '@/types';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AvailablePlayersList } from '@/components/players/AvailablePlayersList';
 
 export const metadata = {
   title: 'Match Details | NextGenFut',
@@ -122,140 +124,167 @@ export default async function MatchDetailsPage({
               </div>
             </div>
 
-            {/* Teams */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Home Team */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <h3 className="text-lg font-semibold">Home Team</h3>
-                  <div className="flex items-center space-x-2">
-                    <Users className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm text-gray-500">
-                      {match.teams.home.length} players
-                    </span>
+            {/* Match Content Tabs */}
+            <Tabs defaultValue="teams" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="teams">Teams</TabsTrigger>
+                <TabsTrigger value="find-players">Find Players</TabsTrigger>
+                {match.status === 'completed' && (
+                  <TabsTrigger value="ratings">Ratings</TabsTrigger>
+                )}
+              </TabsList>
+
+              {/* Teams Tab */}
+              <TabsContent value="teams" className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Home Team */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <h3 className="text-lg font-semibold">Home Team</h3>
+                      <div className="flex items-center space-x-2">
+                        <Users className="h-4 w-4 text-gray-500" />
+                        <span className="text-sm text-gray-500">
+                          {match.teams.home.length} players
+                        </span>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {match.teams.home.length > 0 ? (
+                        <ul className="space-y-2">
+                          {match.teams.home.map((player) => (
+                            <li key={player.id} className="flex items-center space-x-2">
+                              <span>{player.name}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-gray-500">No players yet</p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Away Team */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <h3 className="text-lg font-semibold">Away Team</h3>
+                      <div className="flex items-center space-x-2">
+                        <Users className="h-4 w-4 text-gray-500" />
+                        <span className="text-sm text-gray-500">
+                          {match.teams.away.length} players
+                        </span>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {match.teams.away.length > 0 ? (
+                        <ul className="space-y-2">
+                          {match.teams.away.map((player) => (
+                            <li key={player.id} className="flex items-center space-x-2">
+                              <span>{player.name}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-gray-500">No players yet</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Score */}
+                {match.status === 'completed' && (
+                  <div className="flex justify-center items-center space-x-4 text-2xl font-bold">
+                    <span>{match.scores.home}</span>
+                    <span>-</span>
+                    <span>{match.scores.away}</span>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  {match.teams.home.length > 0 ? (
-                    <ul className="space-y-2">
-                      {match.teams.home.map((player) => (
-                        <li key={player.id} className="flex items-center space-x-2">
-                          <span>{player.name}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-gray-500">No players yet</p>
+                )}
+
+                {/* Actions */}
+                <div className="flex justify-end space-x-4">
+                  {match.status === 'scheduled' && (
+                    <>
+                      <Button variant="outline" onClick={() => {}}>
+                        Join Home Team
+                      </Button>
+                      <Button variant="outline" onClick={() => {}}>
+                        Join Away Team
+                      </Button>
+                    </>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </TabsContent>
 
-              {/* Away Team */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <h3 className="text-lg font-semibold">Away Team</h3>
-                  <div className="flex items-center space-x-2">
-                    <Users className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm text-gray-500">
-                      {match.teams.away.length} players
-                    </span>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {match.teams.away.length > 0 ? (
-                    <ul className="space-y-2">
-                      {match.teams.away.map((player) => (
-                        <li key={player.id} className="flex items-center space-x-2">
-                          <span>{player.name}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-gray-500">No players yet</p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Score */}
-            {match.status === 'completed' && (
-              <div className="flex justify-center items-center space-x-4 text-2xl font-bold">
-                <span>{match.scores.home}</span>
-                <span>-</span>
-                <span>{match.scores.away}</span>
-              </div>
-            )}
-
-            {/* Ratings */}
-            {match.status === 'completed' && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold flex items-center space-x-2">
-                  <Star className="h-5 w-5" />
-                  <span>Player Ratings</span>
-                </h3>
-                {ratings.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {ratings.map((rating) => (
-                      <Card key={rating.id}>
-                        <CardContent className="pt-4">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium">{rating.playerId.name}</p>
-                              <p className="text-sm text-gray-500">
-                                Rated by: {rating.raterId.name}
-                              </p>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                              <span className="font-medium">
-                                {(
-                                  Object.values(rating.skills).reduce(
-                                    (a: number, b: number) => a + b,
-                                    0
-                                  ) / 6
-                                ).toFixed(1)}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                            {Object.entries(rating.skills).map(([skill, value]) => (
-                              <div key={skill} className="flex justify-between">
-                                <span className="capitalize">{skill}</span>
-                                <span>{value}/10</span>
-                              </div>
-                            ))}
-                          </div>
-                          {rating.comments && (
-                            <p className="mt-2 text-sm text-gray-600">
-                              "{rating.comments}"
-                            </p>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ))}
+              {/* Find Players Tab */}
+              <TabsContent value="find-players">
+                {match.status === 'scheduled' ? (
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-500">
+                      Find players who are currently available in your area and invite them to join this match.
+                    </p>
+                    <AvailablePlayersList matchId={match.id} />
                   </div>
                 ) : (
-                  <p className="text-gray-500">No ratings yet</p>
+                  <div className="text-center py-8 text-gray-500">
+                    <p>You can only invite players to scheduled matches.</p>
+                  </div>
                 )}
-              </div>
-            )}
+              </TabsContent>
 
-            {/* Actions */}
-            <div className="flex justify-end space-x-4">
-              {match.status === 'scheduled' && (
-                <>
-                  <Button variant="outline" onClick={() => {}}>
-                    Join Home Team
-                  </Button>
-                  <Button variant="outline" onClick={() => {}}>
-                    Join Away Team
-                  </Button>
-                </>
-              )}
+              {/* Ratings Tab */}
               {match.status === 'completed' && (
-                <Button onClick={() => {}}>Rate Players</Button>
+                <TabsContent value="ratings" className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center space-x-2">
+                    <Star className="h-5 w-5" />
+                    <span>Player Ratings</span>
+                  </h3>
+                  {ratings.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {ratings.map((rating) => (
+                        <Card key={rating.id}>
+                          <CardContent className="pt-4">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-medium">{rating.playerId.name}</p>
+                                <p className="text-sm text-gray-500">
+                                  Rated by: {rating.raterId.name}
+                                </p>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                                <span className="font-medium">
+                                  {(
+                                    Object.values(rating.skills).reduce(
+                                      (a: number, b: number) => a + b,
+                                      0
+                                    ) / 6
+                                  ).toFixed(1)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                              {Object.entries(rating.skills).map(([skill, value]) => (
+                                <div key={skill} className="flex justify-between">
+                                  <span className="capitalize">{skill}</span>
+                                  <span>{value}/10</span>
+                                </div>
+                              ))}
+                            </div>
+                            {rating.comments && (
+                              <p className="mt-2 text-sm text-gray-600">
+                                "{rating.comments}"
+                              </p>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500">No ratings yet</p>
+                  )}
+                  <Button onClick={() => {}}>Rate Players</Button>
+                </TabsContent>
               )}
-            </div>
+            </Tabs>
           </CardContent>
         </Card>
       </div>
