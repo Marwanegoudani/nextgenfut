@@ -8,13 +8,13 @@ import { Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 
-interface CommandProps {
+interface CommandContainerProps {
   children: React.ReactNode;
   className?: string;
   shouldFilter?: boolean;
 }
 
-export function Command({ children, className, shouldFilter }: CommandProps) {
+const CommandContainer = ({ children, className, shouldFilter }: CommandContainerProps) => {
   return (
     <div className={cn("flex flex-col overflow-hidden rounded-md", className)}>
       {children}
@@ -27,7 +27,7 @@ interface CommandInputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   onValueChange?: (value: string) => void;
 }
 
-export function CommandInput({ className, value, onValueChange, ...props }: CommandInputProps) {
+const CommandInput = ({ className, value, onValueChange, ...props }: CommandInputProps) => {
   return (
     <div className="flex items-center border-b px-3">
       <input
@@ -47,7 +47,7 @@ interface CommandEmptyProps {
   children: React.ReactNode;
 }
 
-export function CommandEmpty({ children }: CommandEmptyProps) {
+const CommandEmpty = ({ children }: CommandEmptyProps) => {
   return (
     <div className="py-6 text-center text-sm">{children}</div>
   );
@@ -58,7 +58,7 @@ interface CommandGroupProps {
   className?: string;
 }
 
-export function CommandGroup({ children, className }: CommandGroupProps) {
+const CommandGroup = ({ children, className }: CommandGroupProps) => {
   return (
     <div className={cn("overflow-hidden p-1 text-foreground", className)}>
       {children}
@@ -73,7 +73,7 @@ interface CommandItemProps {
   onSelect?: () => void;
 }
 
-export function CommandItem({ children, className, onSelect }: CommandItemProps) {
+const CommandItem = ({ children, className, onSelect }: CommandItemProps) => {
   return (
     <div
       className={cn(
@@ -93,9 +93,9 @@ const CommandDialog = ({ children, ...props }: CommandDialogProps) => {
   return (
     <Dialog {...props}>
       <DialogContent className="overflow-hidden p-0 shadow-lg">
-        <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
+        <CommandContainer className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
           {children}
-        </Command>
+        </CommandContainer>
       </DialogContent>
     </Dialog>
   )
@@ -143,7 +143,7 @@ const CommandShortcut = ({
 CommandShortcut.displayName = "CommandShortcut"
 
 export {
-  Command,
+  CommandPrimitive as Command,
   CommandDialog,
   CommandInput,
   CommandList,
@@ -152,4 +152,5 @@ export {
   CommandItem,
   CommandShortcut,
   CommandSeparator,
+  CommandContainer,
 } 

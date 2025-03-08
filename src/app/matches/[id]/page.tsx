@@ -8,11 +8,38 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Calendar, Users, Star } from 'lucide-react';
 import { format } from 'date-fns';
+import { Match } from '@/types';
 
 export const metadata = {
   title: 'Match Details | NextGenFut',
   description: 'View match details and join teams',
 };
+
+// View model for populated rating data
+interface RatingWithUsers {
+  id: string;
+  matchId: string;
+  playerId: { id: string; name: string };
+  raterId: { id: string; name: string };
+  skills: {
+    pace: number;
+    shooting: number;
+    passing: number;
+    dribbling: number;
+    defending: number;
+    physical: number;
+  };
+  comments?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface MatchWithPlayers extends Omit<Match, 'teams'> {
+  teams: {
+    home: { id: string; name: string }[];
+    away: { id: string; name: string }[];
+  };
+}
 
 async function getMatchData(id: string) {
   const match = await MatchService.getMatchById(id);
@@ -20,25 +47,39 @@ async function getMatchData(id: string) {
     return null;
   }
 
-  let ratings = [];
+  let ratings: RatingWithUsers[] = [];
   if (match.status === 'completed') {
-    ratings = await RatingService.getMatchRatings(id);
+    const rawRatings = await RatingService.getMatchRatings(id);
+    ratings = rawRatings.map((rating) => ({
+      ...rating,
+      playerId: { id: rating.playerId as unknown as string, name: (rating.playerId as any).name },
+      raterId: { id: rating.raterId as unknown as string, name: (rating.raterId as any).name },
+    }));
   }
 
-  return { match, ratings };
+  const populatedMatch: MatchWithPlayers = {
+    ...match,
+    teams: {
+      home: match.teams.home.map((id: any) => ({ id: id._id || id, name: id.name || '' })),
+      away: match.teams.away.map((id: any) => ({ id: id._id || id, name: id.name || '' })),
+    },
+  };
+
+  return { match: populatedMatch, ratings };
 }
 
 export default async function MatchDetailsPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const session = await getServerSession(authOptions);
   if (!session) {
     redirect('/auth/login');
   }
 
-  const data = await getMatchData(params.id);
+  const data = await getMatchData(id);
   if (!data) {
     redirect('/matches');
   }
@@ -97,7 +138,7 @@ export default async function MatchDetailsPage({
                 <CardContent>
                   {match.teams.home.length > 0 ? (
                     <ul className="space-y-2">
-                      {match.teams.home.map((player: any) => (
+                      {match.teams.home.map((player) => (
                         <li key={player.id} className="flex items-center space-x-2">
                           <span>{player.name}</span>
                         </li>
@@ -123,7 +164,7 @@ export default async function MatchDetailsPage({
                 <CardContent>
                   {match.teams.away.length > 0 ? (
                     <ul className="space-y-2">
-                      {match.teams.away.map((player: any) => (
+                      {match.teams.away.map((player) => (
                         <li key={player.id} className="flex items-center space-x-2">
                           <span>{player.name}</span>
                         </li>
@@ -154,7 +195,7 @@ export default async function MatchDetailsPage({
                 </h3>
                 {ratings.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {ratings.map((rating: any) => (
+                    {ratings.map((rating) => (
                       <Card key={rating.id}>
                         <CardContent className="pt-4">
                           <div className="flex justify-between items-start">

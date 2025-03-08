@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { z } from 'zod';
 import { MatchService } from '@/services/match.service';
@@ -21,11 +21,12 @@ const joinMatchSchema = z.object({
 });
 
 export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
+  request: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   try {
-    const match = await MatchService.getMatchById(params.id);
+    const match = await MatchService.getMatchById(id);
     if (!match) {
       return NextResponse.json({ error: 'Match not found' }, { status: 404 });
     }
@@ -41,9 +42,10 @@ export async function GET(
 }
 
 export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { id: string } }
+  request: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -55,12 +57,12 @@ export async function PATCH(
     }
 
     // Parse and validate request body
-    const body = await req.json();
+    const body = await request.json();
     const validatedData = updateMatchSchema.parse(body);
 
     // Update match
     const match = await MatchService.updateMatchStatus(
-      params.id,
+      id,
       validatedData.status,
       validatedData.scores
     );
@@ -83,9 +85,10 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
+  request: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -96,7 +99,7 @@ export async function DELETE(
       );
     }
 
-    await MatchService.deleteMatch(params.id);
+    await MatchService.deleteMatch(id);
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error('Failed to delete match:', error);
@@ -109,9 +112,10 @@ export async function DELETE(
 
 // Join match endpoint
 export async function POST(
-  req: NextRequest,
-  { params }: { params: { id: string } }
+  request: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -123,12 +127,12 @@ export async function POST(
     }
 
     // Parse and validate request body
-    const body = await req.json();
+    const body = await request.json();
     const validatedData = joinMatchSchema.parse(body);
 
     // Join match
     const match = await MatchService.joinMatch(
-      params.id,
+      id,
       session.user.id,
       validatedData.team
     );
