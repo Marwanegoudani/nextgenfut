@@ -6,10 +6,10 @@ interface MongooseCache {
   promise: Promise<mongoose.Connection> | null;
 }
 
-// Add mongoose to the NodeJS global type
-declare global {
-  var mongoose: MongooseCache | undefined;
-}
+// Declare the global variable without using var
+declare const global: {
+  mongoose?: MongooseCache;
+} & typeof globalThis;
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -27,7 +27,7 @@ if (process.env.NODE_ENV === 'development') {
   global.mongoose = { conn: null, promise: null };
 }
 
-let cached: MongooseCache = global.mongoose || { conn: null, promise: null };
+const cached: MongooseCache = global.mongoose || { conn: null, promise: null };
 
 if (!global.mongoose) {
   global.mongoose = cached;

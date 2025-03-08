@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+import mongoose, { Schema, Document } from 'mongoose';
 import { hash, compare } from 'bcryptjs';
 
 export interface IUser extends Document {

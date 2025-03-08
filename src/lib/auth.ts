@@ -1,41 +1,10 @@
-// Import database connection function
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import dbConnect from "@/lib/db";
 import { UserModel } from "@/models/user";
 import bcrypt from "bcryptjs";
-import NextAuth from "next-auth";
-import { authOptions } from "@/lib/auth";
 
-declare module "next-auth" {
-  interface Session {
-    user: {
-      id: string;
-      email: string;
-      name: string;
-      role: string;
-    }
-  }
-
-  interface User {
-    id: string;
-    email: string;
-    name: string;
-    role: string;
-  }
-}
-
-declare module "next-auth/jwt" {
-  interface JWT {
-    id: string;
-    email: string;
-    name: string;
-    role: string;
-  }
-}
-
-// Define the auth options
-const options: NextAuthOptions = {
+export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: "credentials",
@@ -102,10 +71,4 @@ const options: NextAuthOptions = {
     signOut: '/auth/logout',
     error: '/auth/error',
   }
-};
-
-// Create the auth handler
-const handler = NextAuth(authOptions);
-
-// Export the handler as GET and POST
-export { handler as GET, handler as POST }; 
+}; 

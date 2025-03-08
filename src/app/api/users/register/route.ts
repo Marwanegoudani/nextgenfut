@@ -12,9 +12,6 @@ const registerSchema = z.object({
   role: z.enum(['player', 'team', 'scout']).default('player'),
 });
 
-// Define types based on the schema
-type RegisterRequest = z.infer<typeof registerSchema>;
-
 interface ValidationError {
   path: (string | number)[];
   message: string;
